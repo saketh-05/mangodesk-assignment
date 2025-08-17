@@ -1,9 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 
-interface MainProps {}
-
-const Main: React.FC<MainProps> = () => {
+const Main: React.FC = () => {
   const [transcript, setTranscript] = useState<string>("");
   const [customPrompt, setCustomPrompt] = useState<string>("");
   const [generatedSummary, setGeneratedSummary] = useState<string>("");
