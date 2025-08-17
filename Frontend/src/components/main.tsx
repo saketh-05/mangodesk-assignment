@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 
 interface MainProps {}
 
@@ -8,6 +8,7 @@ const Main: React.FC<MainProps> = () => {
   const [customPrompt, setCustomPrompt] = useState<string>("");
   const [generatedSummary, setGeneratedSummary] = useState<string>("");
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
+
   const [emails, setEmails] = useState<string[]>([]);
   const [showEmailModal, setShowEmailModal] = useState<boolean>(false);
 
@@ -19,35 +20,87 @@ const Main: React.FC<MainProps> = () => {
         setTranscript(e.target?.result as string);
       };
       reader.readAsText(file);
+    } else {
+      alert("Please upload a valid file.");
     }
   };
 
   const generateSummary = async () => {
-    if (!transcript || !customPrompt) return;
+    if (!transcript) return;
+    if (generatedSummary) {
+      setGeneratedSummary("");
+    }
+
+    const regex = /^[\x20-\x7E\n\r\t]*$/;
+
+    if (!regex.test(transcript)) {
+      alert("Transcript contains invalid characters. Please remove them.");
+      return;
+    }
+    if (!regex.test(customPrompt)) {
+      alert("Custom prompt contains invalid characters.");
+      return;
+    }
 
     setIsGenerating(true);
-    // Simulate AI processing
+
+    const getSummary = async () => {
+      try {
+        const response = await fetch(
+          "http://localhost:8000/api/generate/summary",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              text: transcript,
+              prompt: customPrompt || "",
+            }),
+          }
+        );
+        const data = await response.json();
+        // console.log(data);
+        setGeneratedSummary(data.response);
+        setIsGenerating(false);
+      } catch (error) {
+        console.error("Error generating summary:", error);
+      }
+    };
     setTimeout(() => {
-      setGeneratedSummary(
-        `Generated summary based on: "${customPrompt}"\n\n${transcript.substring(
-          0,
-          200
-        )}...`
-      );
-      setIsGenerating(false);
-    }, 2000);
+      getSummary();
+    }, 5000);
   };
 
-  const shareSummary = () => {
+  const shareSummary = async () => {
     const cleaned = emails.map((email) => email.trim()).filter(Boolean);
     if (cleaned.length === 0 || !generatedSummary) {
       alert("Please enter a valid email address and generate a summary first.");
       return;
     }
-    // Simulate email sharing
-    alert(`Summary shared with: ${cleaned.join(", ")}`);
-    setShowEmailModal(false);
-    setEmails([]);
+    // Make API call
+    // console.log("Sharing summary with:", cleaned);
+    const response = await fetch("http://localhost:8000/api/share/summary", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        emails: cleaned,
+        summary: generatedSummary,
+      }),
+    });
+    if (
+      response.ok &&
+      (await response.json()).message === "Summary shared successfully"
+    ) {
+      // console.log("Summary shared successfully");
+      alert(`Summary shared with: ${cleaned.join(", ")}`);
+      setShowEmailModal(false);
+      setEmails([]);
+    } else {
+      console.error("Error sharing summary:", response.statusText);
+    }
   };
 
   const addEmailField = () => {
@@ -58,18 +111,25 @@ const Main: React.FC<MainProps> = () => {
     setEmails((prev) => prev.map((email, i) => (i === index ? value : email)));
   };
 
+  useEffect(() => {
+    if (!transcript) {
+      setGeneratedSummary("");
+    }
+  }, [transcript]);
+
   return (
     <div className='max-w-4xl mx-auto p-6 space-y-6'>
       <h1 className='text-3xl font-bold text-gray-800'>AI Summary Generator</h1>
 
       {/* File Upload Section */}
       <div className='bg-white p-6 rounded-lg shadow-md'>
-        <h2 className='text-xl font-semibold mb-4'>Upload Transcript</h2>
+        <h2 className='text-xl font-semibold mb-0'>Upload Transcript</h2>
+        <span>(Only .txt and .srt files are supported.)</span>
         <input
           type='file'
-          accept='.txt,.doc,.docx'
+          accept='.txt,.srt'
           onChange={handleFileUpload}
-          className='mb-4 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100'
+          className='mb-4 mt-8 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100'
         />
         <textarea
           value={transcript}
@@ -95,11 +155,16 @@ const Main: React.FC<MainProps> = () => {
       <div className='text-center'>
         <button
           onClick={generateSummary}
-          disabled={!transcript || !customPrompt || isGenerating}
+          disabled={!transcript || isGenerating}
           className='px-8 py-3 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed'
         >
           {isGenerating ? "Generating..." : "Generate Summary"}
         </button>
+        {isGenerating && (
+          <p className='text-sm text-gray-500'>
+            Please wait while we generate your summary...
+          </p>
+        )}
       </div>
 
       {/* Generated Summary Section */}
@@ -124,7 +189,10 @@ const Main: React.FC<MainProps> = () => {
 
       {/* Email Modal */}
       {showEmailModal && (
-        <div className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'>
+        <form
+          onSubmit={shareSummary}
+          className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'
+        >
           <div className='bg-white p-6 rounded-lg shadow-xl max-w-md w-full mx-4'>
             <h3 className='text-lg font-semibold mb-4'>Share Summary</h3>
             {emails.length === 0 && (
@@ -154,7 +222,7 @@ const Main: React.FC<MainProps> = () => {
             </button>
             <div className='flex space-x-3'>
               <button
-                onClick={shareSummary}
+                type='submit'
                 className='flex-1 px-4 py-2 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700'
               >
                 Send
@@ -167,7 +235,7 @@ const Main: React.FC<MainProps> = () => {
               </button>
             </div>
           </div>
-        </div>
+        </form>
       )}
     </div>
   );
