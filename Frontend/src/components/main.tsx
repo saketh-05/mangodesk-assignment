@@ -77,7 +77,7 @@ const Main: React.FC = () => {
       return;
     }
     // Make API call
-    // console.log("Sharing summary with:", cleaned);
+    console.log("Sharing summary with:", cleaned);
     const response = await fetch("http://localhost:8000/api/share/summary", {
       method: "POST",
       headers: {
@@ -88,16 +88,15 @@ const Main: React.FC = () => {
         summary: generatedSummary,
       }),
     });
-    if (
-      response.ok &&
-      (await response.json()).message === "Summary shared successfully"
-    ) {
+    const data = await response.json();
+    console.log(data);
+    if (response.ok && data.message === "Summary shared successfully") {
       // console.log("Summary shared successfully");
       alert(`Summary shared with: ${cleaned.join(", ")}`);
       setShowEmailModal(false);
       setEmails([]);
     } else {
-      console.error("Error sharing summary:", response.statusText);
+      console.error("Error sharing summary:", data.message);
     }
   };
 
@@ -187,10 +186,7 @@ const Main: React.FC = () => {
 
       {/* Email Modal */}
       {showEmailModal && (
-        <form
-          onSubmit={shareSummary}
-          className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'
-        >
+        <div className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'>
           <div className='bg-white p-6 rounded-lg shadow-xl max-w-md w-full mx-4'>
             <h3 className='text-lg font-semibold mb-4'>Share Summary</h3>
             {emails.length === 0 && (
@@ -220,7 +216,7 @@ const Main: React.FC = () => {
             </button>
             <div className='flex space-x-3'>
               <button
-                type='submit'
+                onClick={shareSummary}
                 className='flex-1 px-4 py-2 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700'
               >
                 Send
@@ -233,7 +229,7 @@ const Main: React.FC = () => {
               </button>
             </div>
           </div>
-        </form>
+        </div>
       )}
     </div>
   );
